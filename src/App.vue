@@ -31,13 +31,29 @@ const filterSaran = computed(() => {
     !filterTags.value.some(tag => tag.character_name === char.character_name)
   );
 
+  let hasilFilter = [];
+
   if (cari === '') {
-    return isFilterFocused.value ? belumDipilih : [];
+    hasilFilter = isFilterFocused.value ? belumDipilih : [];
+  } else {
+    hasilFilter = belumDipilih.filter(char => {
+      const namaChar = char.character_name || "";
+      return namaChar.toLowerCase().includes(cari);
+    });
   }
 
-  return belumDipilih.filter(char => {
-    const namaChar = char.character_name || "";
-    return namaChar.toLowerCase().includes(cari);
+  // --- LOGIKA PENGURUTAN (SORTING) ---
+  return hasilFilter.sort((a, b) => {
+    if (sortMode.value === 'popular') {
+      // Urutkan dari jumlah terbanyak (paling populer) ke yang paling sedikit
+      const countA = characterFrequencyMap.value[a.id] || 0;
+      const countB = characterFrequencyMap.value[b.id] || 0;
+      if (countB !== countA) {
+        return countB - countA; // Terbanyak di atas
+      }
+    }
+    // Default / Jika mode 'alphabet': Urutkan berdasarkan nama A-Z
+    return (a.character_name || "").localeCompare(b.character_name || "");
   });
 });
 
@@ -340,7 +356,7 @@ onMounted(async () => {
     }
 
     // 3. LOAD PETA SVG
-    const namaFile = '/peta_comifuro23_revisi_final_ini.svg';
+    const namaFile = '/peta_comipara7.svg';
     const response = await fetch(namaFile);
     if (!response.ok) throw new Error(`Gagal load SVG! Status: ${response.status}`);
     const text = await response.text();
@@ -402,6 +418,8 @@ function onTouchEnd(event) {
 
 // 2. Klik Meja 
 async function onPetaClick(event) {
+  const panelEl = document.querySelector('.info-panel');
+  if (panelEl) panelEl.classList.remove('expanded');
   // 1. Reset awal
   loading.value = false;
   errorMessage.value = '';
@@ -993,6 +1011,24 @@ watch(inputSearch, (keywordBaru) => {
   });
 });
 
+// Menghitung jumlah kemunculan setiap karakter berdasarkan ID di semua circles & new_circles
+const characterFrequencyMap = computed(() => {
+  const map = {};
+  allCirclesCache.value.forEach(circle => {
+    const cIds = circle.character_ids;
+    if (Array.isArray(cIds)) {
+      cIds.forEach(id => {
+        map[id] = (map[id] || 0) + 1;
+      });
+    }
+  });
+  return map;
+});
+
+function getCharacterCount(charId) {
+  return characterFrequencyMap.value[charId] || 0;
+}
+
 watch(autoPathMode, (baru) => {
   if (!baru) {
     // Kita tidak menghapus .meja-glow-blue di sini
@@ -1003,6 +1039,83 @@ watch(autoPathMode, (baru) => {
   }
 });
 
+const panelTouchStartY = ref(0);
+
+function onPanelTouchStart(event) {
+  if (event.touches && event.touches.length > 0) {
+    panelTouchStartY.value = event.touches[0].clientY;
+  }
+}
+
+function onPanelTouchEnd(event, panelElement) {
+  if (event.changedTouches && event.changedTouches.length > 0) {
+    const touchEndY = event.changedTouches[0].clientY;
+    const deltaY = panelTouchStartY.value - touchEndY;
+
+    // Cari elemen tombol toggle di dalam panel untuk mengupdate teks/ikonnya secara otomatis
+    const btnText = panelElement.querySelector('.toggle-text');
+    const btnIcon = panelElement.querySelector('.toggle-icon');
+
+    // Jika digeser ke atas > 40px, buka/expand panel
+    if (deltaY > 40) {
+      panelElement.classList.add('expanded');
+      isPanelExpanded.value = true; // KUNCI: Ubah status ke true (Full State)
+      if (btnText) btnText.textContent = 'Perkecil';
+      if (btnIcon) btnIcon.innerHTML = '&#9660;'; // Panah ke bawah
+    } 
+    // Jika digeser ke bawah < -40px, kembalikan ke mode ringkas (minimize)
+    else if (deltaY < -40) {
+      panelElement.classList.remove('expanded');
+      isPanelExpanded.value = false; // KUNCI: Ubah status ke false (Partial State)
+      if (btnText) btnText.textContent = 'Perbesar';
+      if (btnIcon) btnIcon.innerHTML = '&#9650;'; // Panah ke atas
+    }
+  }
+}
+
+function closeFilterDropdown() {
+  filterInput.value = ''; // Mengosongkan teks pencarian
+  isFilterFocused.value = false; // Menutup dropdown fokus
+}
+
+// Fungsi untuk menutup panel info sepenuhnya
+function closeInfoPanel() {
+  const panelEl = document.querySelector('.info-panel');
+  if (panelEl) {
+    panelEl.classList.remove('expanded');
+  }
+  isPanelExpanded.value = false; // Reset status
+  selectedBooth.value = null;
+}
+
+function togglePanelState(event) {
+  const panelEl = document.querySelector('.info-panel');
+  if (!panelEl) return;
+
+  const isExpanded = panelEl.classList.contains('expanded');
+  const btnText = event.currentTarget.querySelector('.toggle-text');
+  const btnIcon = event.currentTarget.querySelector('.toggle-icon');
+
+  if (isExpanded) {
+    panelEl.classList.remove('expanded');
+    isPanelExpanded.value = false; // Kembali ke mode partial (1 baris scroll)
+    if (btnText) btnText.textContent = 'Perbesar';
+    if (btnIcon) btnIcon.innerHTML = '&#9650;';
+  } else {
+    panelEl.classList.add('expanded');
+    isPanelExpanded.value = true;  // Berubah ke full state (grid penuh)
+    if (btnText) btnText.textContent = 'Perkecil';
+    if (btnIcon) btnIcon.innerHTML = '&#9660;';
+  }
+}
+
+const isPanelExpanded = ref(false);
+const sortMode = ref('alphabet'); // Pilihan: 'alphabet' atau 'popular'
+
+// Fungsi untuk mengganti mode urutan saat tombol diklik
+function toggleSortMode() {
+  sortMode.value = sortMode.value === 'alphabet' ? 'popular' : 'alphabet';
+}
 
 </script>
 
@@ -1016,7 +1129,7 @@ watch(autoPathMode, (baru) => {
       <div class="bar"></div>
     </button>
     <h1 class="navbar-logo">
-       Comifuro Arknights Map
+       Comifuro 23 Arknights Map
     </h1>
   </div>
 </nav>
@@ -1097,7 +1210,9 @@ watch(autoPathMode, (baru) => {
         
 
       </div>
-      <div class="info-panel">
+      <div class="info-panel"
+        @touchstart="onPanelTouchStart" 
+        @touchend="(e) => onPanelTouchEnd(e, e.currentTarget)">
 
         <div v-if="!selectedBooth" class="placeholder-text">
           <p>Klik salah satu kotak meja di peta untuk melihat detail info</p>
@@ -1108,6 +1223,24 @@ watch(autoPathMode, (baru) => {
         </div>
 
         <div v-else-if="infoCircle" class="card">
+
+          <!-- BARIS TOMBOL KONTROL PANEL (Tombol Toggle di Tengah, Close di Kanan) -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; width: 100%; position: relative;">
+            
+            <!-- Elemen Kosong (Spacer) di Kiri untuk menyeimbangkan layout -->
+            <div style="width: 32px;"></div>
+
+            <!-- Tombol Toggle Partial / Full State (DI TENGAH) -->
+            <button @click="togglePanelState($event)" title="Ubah Ukuran Panel" style="background: #f1f5f9; border: none; padding: 4px 12px; border-radius: 14px; font-size: 0.8rem; font-weight: bold; color: #475569; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+              <span class="toggle-icon">&#9650;</span> <span class="toggle-text">Perbesar</span>
+            </button>
+
+            <!-- Tombol Close Panel (DI KANAN) -->
+            <button @click="closeInfoPanel" title="Tutup Panel" style="background: #f1f5f9; border: none; width: 28px; height: 28px; border-radius: 50%; font-size: 1rem; font-weight: bold; color: #64748b; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+              &times;
+            </button>
+          </div>
+
           <div v-if="isAdmin && dataUsulanPending && Array.isArray(dataUsulanPending)" 
               style="background: #fff3cd; border: 1px solid #ffeeba; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
             <strong style="color: #856404;">⚠️ Ada {{ dataUsulanPending.length }} Usulan di Meja Ini:</strong>
@@ -1153,20 +1286,25 @@ watch(autoPathMode, (baru) => {
               }}
             </span>
           </p>
-          <div class="character-preview-section" v-if="getObjKarakterDariIds(infoCircle.character_ids).length > 0">
-            <strong>Karakter yang Dijual:</strong>
-            
-            <div class="portrait-container">
-              <div v-for="char in getObjKarakterDariIds(infoCircle.character_ids)" 
-                  :key="char.id" 
-                  class="portrait-card"
-                  :title="char.character_name"> <img :src="char.image_url" 
-                    :alt="char.character_name" 
-                    class="portrait-img"
-                    onerror="this.src='/src/assets/avatar_placeholder.png';"> <span class="portrait-name">{{ char.character_name }}</span>
+          <!-- BAGIAN KARAKTER YANG DIJUAL (Dinamis: Partial = 1 Baris Scroll Samping, Full = Grid Penuh) -->
+          <!-- BAGIAN KARAKTER YANG DIJUAL -->
+            <div class="character-preview-section" v-if="getObjKarakterDariIds(infoCircle.character_ids).length > 0">
+              <strong>Karakter yang Dijual:</strong>
+              
+              <!-- PERBAIKAN DI SINI: Tambahkan pengondisian kelas is-partial -->
+              <div :class="['portrait-container', { 'is-partial': !isPanelExpanded }]">
+                <div v-for="char in getObjKarakterDariIds(infoCircle.character_ids)" 
+                    :key="char.id" 
+                    class="portrait-card"
+                    :title="char.character_name"> 
+                  <img :src="char.image_url" 
+                      :alt="char.character_name" 
+                      class="portrait-img"
+                      onerror="this.src='/src/assets/avatar_placeholder.png';"> 
+                  <span class="portrait-name">{{ char.character_name }}</span>
+                </div>
               </div>
             </div>
-          </div>
 
           <p v-else>
             <strong>Karakter:</strong> <span style="color: grey;">-</span>
@@ -1300,7 +1438,7 @@ watch(autoPathMode, (baru) => {
             </div>
 
             <div class="form-group">
-              <label>Link Katalog (Google Drive / Opsional):</label>
+              <label>Link Katalog (Google Drive / X/ Instagram):</label>
               <input v-model="inputKatalog" type="url" placeholder="https://drive.google.com/...">
             </div>
 
@@ -1334,36 +1472,74 @@ watch(autoPathMode, (baru) => {
 
         </div>
 
-        
-
       </div>
     </div>
-    <div class="search-box" style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #ddd; margin-top: 20px; margin-bottom: 300px; position: relative; box-shadow: 0 -2px 10px rgba(0,0,0,0.05);">
-  <label style="font-weight: bold; display: block; margin-bottom: 5px;">Filter Karakter:</label>
 
-  <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 5px;">
-    <span v-for="tag in filterTags" :key="tag.character_name" style="background: #3498db; color: white; padding: 4px 10px 4px 4px; border-radius: 20px; font-size: 0.9em; display: flex; align-items: center; gap: 6px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-      <img :src="tag.image_url" alt="" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover; background: white; border: 2px solid white;" onerror="this.style.display='none'" />
-      {{ tag.character_name }}
-      <button @click="removeFilterTag(tag)" style="background: none; border: none; color: white; cursor: pointer; font-weight: bold; font-size: 1.1em; margin-left: 2px; opacity: 0.8;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'">
-        &times;
-      </button>
-    </span>
-  </div>
+    <div class="search-box" style="background: white; padding: 12px 15px; border-radius: 24px; border: 1px solid #e2e8f0; margin-top: 0px; position: relative; box-shadow: 0 4px 20px rgba(0,0,0,0.15);">
+      <div v-if="filterSaran.length > 0" @click="closeFilterDropdown" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: transparent; z-index: 999;"></div>
+      <!-- 1. BARIS INPUT PENCARIAN & TOMBOL KEMBALI (Paling Atas) -->
+      <div style="display: flex; align-items: center; gap: 6px; width: 100%; margin-bottom: 6px;">
+        <!-- Tombol Kembali / Tutup Dropdown -->
+        <button @click="closeFilterDropdown" title="Tutup" style="background: transparent; border: none; font-size: 1.2rem; font-weight: bold; color: #64748b; cursor: pointer; padding: 0 4px; display: flex; align-items: center; justify-content: center;">
+          &#8592;
+        </button>
 
-  <input type="text" v-model="filterInput" placeholder="Ketik nama karakter (misal: Amiya)..." style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;" @focus="isFilterFocused = true" @blur="onFilterBlur">
+        <!-- Input Pencarian -->
+        <input type="text" v-model="filterInput" placeholder="Cari operator..." style="width: 100%; padding: 6px 4px; border: none; outline: none; font-size: 0.95rem; background: transparent;" @focus="isFilterFocused = true" @blur="onFilterBlur">
 
-  <ul v-if="filterSaran.length > 0" style="position: absolute; top: 100%; left: 0; right: 0; z-index: 100; background: white; border: 1px solid #ddd; border-radius: 0 0 8px 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); max-height: 500px; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; padding: 10px; list-style: none; margin: 0;">
-    <li v-for="saran in filterSaran" :key="saran.character_name" @click="addFilterTag(saran)" style="height: 130px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; background: #f8f9fa; border: 1px solid #eee; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.8em; color: #444; transition: all 0.2s; overflow: hidden; padding: 5px;" onmouseover="this.style.background='#3498db'; this.style.color='white'; this.style.borderColor='#3498db'; this.style.transform='scale(1.05)';" onmouseout="this.style.background='#f8f9fa'; this.style.color='#444'; this.style.borderColor='#eee'; this.style.transform='scale(1)';">
-      
-      <img :src="saran.image_url" alt="" style="width: 100%; height: 90px; object-fit: contain; margin-bottom: 5px;" onerror="this.style.display='none'" />
+        <!-- TOMBOL SORT (Ubah Mode Urutan di Kanan) -->
+        <button @click="toggleSortMode" :title="sortMode === 'alphabet' ? 'Mode: Abjad (A-Z). Klik untuk ubah ke Terpopuler' : 'Mode: Terpopuler. Klik untuk ubah ke Abjad'" style="background: #f1f5f9; border: none; padding: 6px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: bold; color: #475569; cursor: pointer; display: flex; align-items: center; gap: 4px; white-space: nowrap; flex-shrink: 0;">
+          <span v-if="sortMode === 'alphabet'">🔤 A-Z</span>
+          <span v-else>🔥 Populer</span>
+        </button>
+      </div>
 
-      <span style="width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-        {{ saran.character_name }}
-      </span>
-    </li>
-  </ul>
-</div>
+      <!-- 2. BARIS TAG/CHIPS OPERATOR YANG SUDAH DIPILIH (Di bawah kotak pencarian) -->
+      <div style="display: flex; flex-direction: row; overflow-x: auto; overflow-y: hidden; gap: 6px; margin-bottom: 6px; padding-bottom: 4px; align-items: center;" v-if="filterTags.length > 0">
+        <span v-for="tag in filterTags" :key="tag.character_name" style="position: relative; display: inline-flex; align-items: center; flex-shrink: 0;" :title="tag.character_name">
+          <!-- Foto Avatar Bulat -->
+          <img :src="tag.image_url" alt="" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: white; border: 2px solid #3498db; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" onerror="this.style.display='none'" />
+          
+          <!-- Tombol Silang Kecil di Pojok Kanan Atas Avatar -->
+          <button @click="removeFilterTag(tag)" style="position: absolute; top: -2px; right: -2px; background: #e74c3c; border: 2px solid white; color: white; border-radius: 50%; width: 16px; height: 16px; cursor: pointer; font-weight: bold; font-size: 0.65rem; display: flex; align-items: center; justify-content: center; padding: 0; line-height: 1;">
+            &times;
+          </button>
+        </span>
+      </div>
+
+      <!-- 3. DROPDOWN SARAN KARAKTER / 5 KOLOM PERSEGI (Paling Bawah) -->
+      <ul v-if="filterSaran.length > 0" class="filter-dropdown-menu" style="list-style: none; margin: 4px 0 0 0; padding: 6px 0 0 0; max-height: 240px; overflow-y: auto; display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; border-top: 1px solid #f1f5f9;">
+        <li v-for="saran in filterSaran" :key="saran.character_name" @click="addFilterTag(saran)" style="aspect-ratio: 1 / 1; height: auto; display: flex; flex-direction: column; align-items: center; justify-content: space-between; text-align: center; background: #f8f9fa; border: 1px solid #eee; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.75em; color: #444; transition: all 0.2s; overflow: hidden; padding: 3px; box-sizing: border-box;" onmouseover="this.style.background='#3498db'; this.style.color='white'; this.style.borderColor='#3498db';" onmouseout="this.style.background='#f8f9fa'; this.style.color='#444'; this.style.borderColor='#eee';">
+          
+          <!-- Container Gambar & Badge Counter -->
+          <div style="position: relative; width: 100%; height: 65%; display: flex; align-items: center; justify-content: center;">
+            <img :src="saran.image_url" alt="" style="max-width: 100%; height: 100%; object-fit: contain;" onerror="this.style.display='none'" />
+            
+            <!-- Badge Angka Kecil di Pojok Kanan Atas Gambar -->
+            <span :style="{
+              position: 'absolute',
+              bottom: '0px',
+              right: '0px',
+              backgroundColor: getCharacterCount(saran.id) > 0 ? '#2ecc71' : '#e74c3c',
+              color: 'white',
+              fontSize: '0.75em',
+              fontWeight: 'bold',
+              padding: '1px 4px',
+              borderRadius: '8px',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
+              }">
+                {{ getCharacterCount(saran.id) }}
+            </span>
+          </div>
+
+          <!-- Nama Karakter -->
+          <span style="width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.65rem;">
+            {{ saran.character_name }}
+          </span>
+        </li>
+      </ul>
+    </div>
+
   </div>
 
 <div v-if="showCustomAlert" class="custom-alert-overlay" @click.self="tutupPesan">
@@ -1385,7 +1561,6 @@ watch(autoPathMode, (baru) => {
 
   </div>
 </div>
-
 
 </template>
 
@@ -1420,117 +1595,128 @@ body {
   padding: 0;
 }
 
-@media (max-width: 768px) {
+.filter-dropdown-menu {
+  position: absolute !important;
+  top: 100% !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 3005 !important;
+  background: white !important;
+  border: 1px solid #ddd !important;
+  border-radius: 0 0 12px 12px !important;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.15) !important;
+  max-height: 250px !important; /* Batasi tinggi di desktop/general */
+  overflow-y: auto !important;
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)) !important;
+  gap: 8px !important;
+  padding: 10px !important;
+  list-style: none !important;
+  margin: 0 !important;
+}
 
+@media (max-width: 768px) {
   h1 {
-    /* 1. Perkecil ukuran huruf (tadinya mungkin 1.4rem atau 1.5rem) */
-    font-size: 1.25rem !important; 
-    
-    /* 2. Rapatkan jarak antar baris */
+    font-size: 1.1rem !important; 
     line-height: 1.1; 
-    
-    /* 3. Beri jarak aman dari tombol hamburger */
-    margin-top: 5px !important;
-    margin-bottom: 10px !important;
-    
-    /* 4. Pastikan teks tidak terlalu lebar */
-    max-width: 85%; 
-    margin-left: auto !important;
-    margin-right: auto !important;
-    
-    font-weight: 800; /* Tetap tebal agar tegas */
+    margin: 5px auto !important;
+    max-width: 80%; 
+    font-weight: 800;
     text-align: center;
   }
-  /* 1. Pastikan container tidak punya padding kiri-kanan yang mengganggu */
+
   .container {
-    padding-left: 0 !important;
-    padding-right: 0 !important;
-    width: 100vw !important; /* Paksa selebar layar HP */
+    padding: 0 !important;
+    width: 100vw !important;
     overflow-x: hidden;
     display: flex;
     flex-direction: column;
     align-items: center;
   }
 
-  /* 2. Layout harus menjadi Anchor tengah */
   .layout {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important; 
-    justify-content: flex-start !important;
-    width: 100% !important;
-    margin: 0 auto !important;
-    padding: 0 !important;
-    gap: 10px !important;
+    display: block !important;
   }
 
-  /* 3. Col-left sebagai wrapper peta */
   .col-left {
     width: 100% !important;
     display: flex !important;
     flex-direction: column !important;
-    align-items: center !important; /* Menengahkan isinya (map-window) */
+    align-items: center !important;
     margin: 0 !important;
   }
 
-  /* 4. Map Window dengan margin auto yang kuat */
-  .map-window {
-    width: 100% !important; /* Sedikit lebih kecil agar gap kanan-kiri terlihat seimbang */
-    height: 400px !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-    display: block !important;
-    border-radius: 5px;
-  }
-
-  /* 5. Info Panel (Form) */
+  /* --- PANEL INFORMASI BAWAH (Bottom Sheet) --- */
   .info-panel {
-    width: 100% !important; /* Lebar harus SAMA dengan map-window */
-    margin-left: auto !important;
-    margin-right: auto !important;
-    padding: 15px !important;
-    box-sizing: border-box;
-  }
-
-  /* 6. Hilangkan elemen dekorasi yang mungkin mendorong layout (jika ada) */
-  .pixel-decoration-atau-apapun {
-    display: none; 
-  }
-
-  .search-box {
-    width: 100% !important; /* Samakan dengan lebar peta agar simetris */
-    margin: 20px auto !important; /* Beri jarak atas-bawah dan tengahkan */
-    padding: 15px !important;
-    box-sizing: border-box;
-    display: block !important;
-    position: relative !important;
-  }
-
-  /* 2. Lebarkan Input Pencarian di dalamnya */
-  .search-box input {
-    width: 100% !important;
-    font-size: 1rem !important; /* Ukuran teks agar enak diketik jari */
-    padding: 10px !important;
-    box-sizing: border-box;
-  }
-
-  /* 3. Atur Grid Karakter (Saran) agar tidak berantakan */
-  .search-box ul {
-    width: 100% !important;
-    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)) !important; /* Grid lebih kecil agar muat banyak */
-    gap: 5px !important;
-    padding: 10px !important;
+    position: fixed !important;
+    bottom: 0 !important;
     left: 0 !important;
     right: 0 !important;
+    top: auto !important;
+    width: 100% !important;
+    max-height: 65vh !important; /* Dinaikkan dari 52vh ke 65vh agar muat sampai karakter */
+    height: auto !important;
+    text-align: left !important;
+    overflow-y: hidden !important; /* Sembunyikan scroll vertikal di mode partial */
+    z-index: 1005 !important;
+    background-color: #ffffff !important;
+    box-shadow: 0 -4px 30px rgba(0,0,0,0.2) !important;
+    border-radius: 24px 24px 0 0 !important;
+    padding: 15px 20px 25px 20px !important;
+    box-sizing: border-box;
+    transition: max-height 0.3s cubic-bezier(0.25, 1, 0.5, 1) !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  
+  .info-panel.expanded {
+    max-height: 85vh !important;
+    overflow-y: auto !important; /* Aktifkan scroll penuh saat ditekan Perbesar */
+    z-index: 2000 !important;
   }
 
-  /* 4. Pastikan tag yang sudah dipilih juga rapi */
-  .search-box span {
-    font-size: 0.8rem !important;
-    padding: 4px 8px !important;
+  .info-panel::before {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 4px;
+    background-color: #cbd5e1;
+    border-radius: 2px;
+    margin: 0 auto 12px auto;
+    cursor: grab;
   }
+
+  .info-panel .placeholder-text {
+    display: none !important; 
+  }
+
+  /* --- TAMBAHAN KODE KAMU DI SINI --- */
+  .info-panel .btn-submit,  
+  .info-panel .btn-small {
+    border-radius: 14px !important;
+    padding: 12px 20px !important;
+    font-size: 1rem !important;
+    font-weight: bold;
+  }
+  .info-panel p,
+  .info-panel div,
+  .info-panel span {
+    margin-top: 2px !important;
+    margin-bottom: 4px !important;
+  }
+
+  /* Jika teks tersebut menggunakan elemen heading seperti h2, h3, h4 */
+  .info-panel h2,
+  .info-panel h3,
+  .info-panel h4 {
+    margin-top: 4px !important;
+    margin-bottom: 4px !important;
+    line-height: 1.2 !important;
+  }
+  /* ---------------------------------- */
+
   .navbar-logo {
-    font-size: 0.95rem; /* Judul lebih kecil di HP agar muat */
+    font-size: 0.95rem;
   }
   
   .navbar {
@@ -1565,14 +1751,119 @@ body {
 }
 
 /* Kolom Kanan (Info) - Mengambil 1 bagian layar */
-.info-panel { 
-  flex: 1; 
-  background-color: #f9f9f9 !important; /* Paksa background tetap terang */
-  color: #2c3e50 !important;           /* Paksa teks tetap gelap */
-  padding: 20px; 
-  border-radius: 8px; 
-  min-width: 250px; 
-  height: fit-content;
+.info-panel {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    width: 100% !important;
+    /* Tinggi default saat tertutup / belum ada info atau baru klik (menampilkan sebagian info) */
+    max-height: 320px !important; 
+    height: auto !important;
+    overflow-y: hidden !important; /* Sengaja disembunyikan scrollnya saat mode ringkas */
+    z-index: 1005 !important;
+    background-color: #ffffff !important;
+    box-shadow: 0 -4px 30px rgba(0,0,0,0.2) !important;
+    border-radius: 24px 24px 0 0 !important;
+    padding: 12px 20px 20px 20px !important;
+    box-sizing: border-box;
+    transition: max-height 0.3s cubic-bezier(0.25, 1, 0.5, 1), transform 0.3s ease !important;
+  }
+  .info-panel.expanded {
+    max-height: 78vh !important;
+    overflow-y: auto !important; /* Aktifkan scroll saat ditarik penuh */
+    z-index: 2000 !important;
+  }
+  .info-panel::before {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 4px;
+    background-color: #cbd5e1;
+    border-radius: 2px;
+    margin: 0 auto 10px auto;
+    cursor: grab;
+  }
+  .info-panel .placeholder-text {
+    text-align: left;
+    color: #64748b;
+    font-size: 0.9rem;
+    padding: 5px 0;
+    display: block !important; /* Tetap dimunculkan sebagai info ringkas di bawah */
+  }
+/* 2. Kotak Pencarian & Filter Karakter (Di pojok kiri bawah / melayang) */
+.search-box {
+  position: fixed !important;
+  top: 70px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: 90% !important;
+  max-width: 420px !important;
+  height: auto !important;
+  max-height: none !important;
+  z-index: 3000 !important;
+  background-color: #ffffff !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15) !important;
+  border-radius: 24px !important; /* Bentuk pil / kapsul */
+  padding: 10px 15px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  border: 1px solid #e2e8f0 !important;
+  box-sizing: border-box !important;
+}
+.search-box input {
+  width: 100% !important;
+  font-size: 0.95rem !important;
+  padding: 6px 10px !important;
+  border: none !important;
+  background: transparent !important;
+  box-sizing: border-box;
+}
+
+.search-box ul,
+.filter-dropdown-menu {
+  grid-template-columns: repeat(5, 1fr) !important;
+  gap: 4px !important;
+  padding: 4px !important;
+  max-height: 500px !important;
+}
+/* Dropdown saran karakter di dalam search box */
+/* Memaksa setiap kotak kartu karakter menjadi PERSEGI SEMPURNA (1:1) */
+.search-box ul li,
+.filter-dropdown-menu li {
+  height: unset !important;
+  min-height: unset !important;
+  max-height: unset !important;
+  aspect-ratio: 1 / 1 !important;
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 4px !important;
+  box-sizing: border-box !important;
+}
+
+/* Memperbaiki container gambar di dalamnya */
+.search-box ul li div,
+.filter-dropdown-menu li div {
+  height: 70% !important;
+  min-height: unset !important;
+  width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin-bottom: 0 !important;
+}
+
+/* Memperbaiki ukuran gambar agar proporsional di dalam kotak persegi */
+.search-box ul li img,
+.filter-dropdown-menu li img {
+  width: auto !important;
+  max-width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
 }
 
 /* Tambahkan ini di bawahnya untuk mengunci warna semua teks di dalam panel */
@@ -1594,20 +1885,26 @@ body {
 /* Pastikan card di dalam panel juga tetap putih */
 .info-panel .card, 
 .info-panel .form-card {
-  background-color: #ffffff !important;
-  color: #2c3e50 !important;
-  border: 1px solid #dddddd;
+  background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
 }
 
 /* --- KODE ZOOM (Tetap sama seperti sebelumnya) --- */
 .map-window {
-  width: 100%;
-  height: 600px;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 1 !important; /* Di lapisan paling bawah latar belakang */
+  border: none !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
   overflow: hidden;
-  border: 2px solid #ddd;
-  border-radius: 5px;
   background-color: #f9f9f9;
-  position: relative;
   cursor: grab;
 }
 .map-window:active { cursor: grabbing; }
@@ -1982,6 +2279,22 @@ input[type="url"],
   flex-wrap: wrap; /* Turun ke bawah jika tidak muat */
   gap: 10px; /* Jarak antar foto */
   margin-top: 8px;
+}
+
+.portrait-container.is-partial {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important; /* KUNCI UTAMA: Mencegah elemen turun ke baris bawah */
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  gap: 8px !important;
+  padding-bottom: 6px !important;
+  scroll-snap-type: x mandatory;
+}
+
+.portrait-container.is-partial .portrait-card {
+  flex: 0 0 65px !important;
+  scroll-snap-align: start;
 }
 
 /* Kotak untuk satu foto + nama */
@@ -2464,4 +2777,5 @@ input[type="url"],
 .navbar-spacer {
   height: 60px;
 }
+
 </style>
