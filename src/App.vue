@@ -200,7 +200,7 @@ async function fetchUserRole() {
 function onFilterBlur() {
   setTimeout(() => {
     isFilterFocused.value = false;
-  }, 200);
+  }, 250);
 }
 
 function getMejaCenter(id) {
@@ -1129,7 +1129,7 @@ function toggleSortMode() {
       <div class="bar"></div>
     </button>
     <h1 class="navbar-logo">
-       Comifuro 23 Arknights Map
+       Comifuro 23 Arknights MAP
     </h1>
   </div>
 </nav>
@@ -1476,26 +1476,27 @@ function toggleSortMode() {
     </div>
 
     <div class="search-box" style="background: white; padding: 12px 15px; border-radius: 24px; border: 1px solid #e2e8f0; margin-top: 0px; position: relative; box-shadow: 0 4px 20px rgba(0,0,0,0.15);">
-      <div v-if="filterSaran.length > 0" @click="closeFilterDropdown" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: transparent; z-index: 999;"></div>
+      
       <!-- 1. BARIS INPUT PENCARIAN & TOMBOL KEMBALI (Paling Atas) -->
-      <div style="display: flex; align-items: center; gap: 6px; width: 100%; margin-bottom: 6px;">
+      <div style="display: flex; align-items: center; gap: 6px; width: 100%; margin-bottom: 6px; position: relative; z-index: 10;">
         <!-- Tombol Kembali / Tutup Dropdown -->
         <button @click="closeFilterDropdown" title="Tutup" style="background: transparent; border: none; font-size: 1.2rem; font-weight: bold; color: #64748b; cursor: pointer; padding: 0 4px; display: flex; align-items: center; justify-content: center;">
           &#8592;
         </button>
 
         <!-- Input Pencarian -->
-        <input type="text" v-model="filterInput" placeholder="Cari operator..." style="width: 100%; padding: 6px 4px; border: none; outline: none; font-size: 0.95rem; background: transparent;" @focus="isFilterFocused = true" @blur="onFilterBlur">
+        <!-- Input Pencarian (Hapus @blur="onFilterBlur") -->
+<input type="text" v-model="filterInput" placeholder="Cari operator..." style="width: 100%; padding: 6px 4px; border: none; outline: none; font-size: 0.95rem; background: transparent;" @focus="isFilterFocused = true">
 
         <!-- TOMBOL SORT (Ubah Mode Urutan di Kanan) -->
-        <button @click="toggleSortMode" :title="sortMode === 'alphabet' ? 'Mode: Abjad (A-Z). Klik untuk ubah ke Terpopuler' : 'Mode: Terpopuler. Klik untuk ubah ke Abjad'" style="background: #f1f5f9; border: none; padding: 6px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: bold; color: #475569; cursor: pointer; display: flex; align-items: center; gap: 4px; white-space: nowrap; flex-shrink: 0;">
+        <button @click.stop.prevent="toggleSortMode" :title="sortMode === 'alphabet' ? 'Mode: Abjad (A-Z)' : 'Mode: Terpopuler'" style="background: #f1f5f9; border: none; padding: 6px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: bold; color: #475569; cursor: pointer; display: flex; align-items: center; gap: 4px; white-space: nowrap; flex-shrink: 0;">
           <span v-if="sortMode === 'alphabet'">🔤 A-Z</span>
           <span v-else>🔥 Populer</span>
         </button>
       </div>
 
-      <!-- 2. BARIS TAG/CHIPS OPERATOR YANG SUDAH DIPILIH (Di bawah kotak pencarian) -->
-      <div style="display: flex; flex-direction: row; overflow-x: auto; overflow-y: hidden; gap: 6px; margin-bottom: 6px; padding-bottom: 4px; align-items: center;" v-if="filterTags.length > 0">
+      <!-- 2. BARIS TAG/CHIPS OPERATOR YANG SUDAH DIPILIH -->
+      <div style="display: flex; flex-direction: row; overflow-x: auto; overflow-y: hidden; gap: 6px; margin-bottom: 6px; padding-bottom: 4px; align-items: center; position: relative; z-index: 10;" v-if="filterTags.length > 0">
         <span v-for="tag in filterTags" :key="tag.character_name" style="position: relative; display: inline-flex; align-items: center; flex-shrink: 0;" :title="tag.character_name">
           <!-- Foto Avatar Bulat -->
           <img :src="tag.image_url" alt="" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: white; border: 2px solid #3498db; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" onerror="this.style.display='none'" />
@@ -1507,8 +1508,8 @@ function toggleSortMode() {
         </span>
       </div>
 
-      <!-- 3. DROPDOWN SARAN KARAKTER / 5 KOLOM PERSEGI (Paling Bawah) -->
-      <ul v-if="filterSaran.length > 0" class="filter-dropdown-menu" style="list-style: none; margin: 4px 0 0 0; padding: 6px 0 0 0; max-height: 240px; overflow-y: auto; display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; border-top: 1px solid #f1f5f9;">
+      <!-- 3. DROPDOWN SARAN KARAKTER -->
+      <ul v-if="filterSaran.length > 0" class="filter-dropdown-menu" style="position: relative; z-index: 10; list-style: none; margin: 4px 0 0 0; padding: 6px 0 0 0; max-height: 240px; overflow-y: auto; display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; border-top: 1px solid #f1f5f9;">
         <li v-for="saran in filterSaran" :key="saran.character_name" @click="addFilterTag(saran)" style="aspect-ratio: 1 / 1; height: auto; display: flex; flex-direction: column; align-items: center; justify-content: space-between; text-align: center; background: #f8f9fa; border: 1px solid #eee; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.75em; color: #444; transition: all 0.2s; overflow: hidden; padding: 3px; box-sizing: border-box;" onmouseover="this.style.background='#3498db'; this.style.color='white'; this.style.borderColor='#3498db';" onmouseout="this.style.background='#f8f9fa'; this.style.color='#444'; this.style.borderColor='#eee';">
           
           <!-- Container Gambar & Badge Counter -->
@@ -1538,6 +1539,9 @@ function toggleSortMode() {
           </span>
         </li>
       </ul>
+
+      <!-- 4. OVERLAY TRANSPARAN DI LUAR KOTAK (Ditaruh di Paling Bawah agar tidak menutupi tombol) -->
+      <div v-if="filterSaran.length > 0" @click="closeFilterDropdown" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: transparent; z-index: 1;"></div>
     </div>
 
   </div>
