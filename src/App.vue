@@ -1246,36 +1246,46 @@ watch(inputSearchKarakter, () => {
         
 
       </div>
-      <div class="info-panel"
+      <!-- PANEL INFORMASI BAWAH (Bottom Sheet) -->
+      <div class="info-panel" :class="{ 'expanded': showForm || isPanelExpanded }"
         @touchstart="onPanelTouchStart" 
         @touchend="(e) => onPanelTouchEnd(e, e.currentTarget)">
 
+        <!-- KONDISI A: BOOTH BELUM ADA DATA (FORM KOSONG) -> HANYA ADA TOMBOL CLOSE -->
+        <div v-if="showForm" style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 8px; width: 100%; position: relative;">
+          <!-- Tombol Close Panel Saja -->
+          <button @click="closeInfoPanel" title="Tutup Panel" style="background: #f1f5f9; border: none; width: 28px; height: 28px; border-radius: 50%; font-size: 1rem; font-weight: bold; color: #64748b; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+            &times;
+          </button>
+        </div>
+
+        <!-- KONDISI B: BOOTH SUDAH ADA DATA / NORMAL -> ADA TOMBOL TOGGLE & CLOSE -->
+        <div v-else-if="infoCircle" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; width: 100%; position: relative;">
+          <div style="width: 32px;"></div>
+
+          <!-- Tombol Toggle Partial / Full State -->
+          <button @click="togglePanelState($event)" title="Ubah Ukuran Panel" style="background: #f1f5f9; border: none; padding: 4px 12px; border-radius: 14px; font-size: 0.8rem; font-weight: bold; color: #475569; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+            <span class="toggle-icon">&#9650;</span> <span class="toggle-text">Perbesar</span>
+          </button>
+
+          <!-- Tombol Close Panel -->
+          <button @click="closeInfoPanel" title="Tutup Panel" style="background: #f1f5f9; border: none; width: 28px; height: 28px; border-radius: 50%; font-size: 1rem; font-weight: bold; color: #64748b; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+            &times;
+          </button>
+        </div>
+
+        <!-- PLACEHOLDER SAAT BELUM KLIK BOOTH -->
         <div v-if="!selectedBooth" class="placeholder-text">
           <p>Klik salah satu kotak meja di peta untuk melihat detail info</p>
         </div>
 
+        <!-- STATUS LOADING -->
         <div v-else-if="loading">
           <p>Sedang memuat data...</p>
         </div>
 
-        <div v-else-if="infoCircle" class="card">
-
-          <!-- BARIS TOMBOL KONTROL PANEL (Tombol Toggle di Tengah, Close di Kanan) -->
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; width: 100%; position: relative;">
-            
-            <!-- Elemen Kosong (Spacer) di Kiri untuk menyeimbangkan layout -->
-            <div style="width: 32px;"></div>
-
-            <!-- Tombol Toggle Partial / Full State (DI TENGAH) -->
-            <button @click="togglePanelState($event)" title="Ubah Ukuran Panel" style="background: #f1f5f9; border: none; padding: 4px 12px; border-radius: 14px; font-size: 0.8rem; font-weight: bold; color: #475569; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-              <span class="toggle-icon">&#9650;</span> <span class="toggle-text">Perbesar</span>
-            </button>
-
-            <!-- Tombol Close Panel (DI KANAN) -->
-            <button @click="closeInfoPanel" title="Tutup Panel" style="background: #f1f5f9; border: none; width: 28px; height: 28px; border-radius: 50%; font-size: 1rem; font-weight: bold; color: #64748b; cursor: pointer; display: flex; align-items: center; justify-content: center;">
-              &times;
-            </button>
-          </div>
+        <!-- KARTU DETAIL CIRCLE (Hanya muncul jika ada data & form tidak aktif) -->
+        <div v-else-if="infoCircle && !showForm" class="card">
 
           <div v-if="isAdmin && dataUsulanPending && Array.isArray(dataUsulanPending)" 
               style="background: #fff3cd; border: 1px solid #ffeeba; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
@@ -1310,6 +1320,7 @@ watch(inputSearchKarakter, () => {
               </div>
             </div>
           </div>
+
           <h3>Meja: {{ infoCircle.booth_id }}</h3>
           <p><strong>Nama:</strong> {{ infoCircle.circle_name }}</p>
           <p>
@@ -1322,45 +1333,45 @@ watch(inputSearchKarakter, () => {
               }}
             </span>
           </p>
-          <!-- BAGIAN KARAKTER YANG DIJUAL (Dinamis: Partial = 1 Baris Scroll Samping, Full = Grid Penuh) -->
+
           <!-- BAGIAN KARAKTER YANG DIJUAL -->
-            <div class="character-preview-section" v-if="getObjKarakterDariIds(infoCircle.character_ids).length > 0">
-              <strong>Karakter yang Dijual:</strong>
-              
-              <!-- PERBAIKAN DI SINI: Tambahkan pengondisian kelas is-partial -->
-              <div :class="['portrait-container', { 'is-partial': !isPanelExpanded }]">
-                <div v-for="char in getObjKarakterDariIds(infoCircle.character_ids)" 
-                    :key="char.id" 
-                    class="portrait-card"
-                    :title="char.character_name"> 
-                  <img :src="char.image_url" 
-                      :alt="char.character_name" 
-                      class="portrait-img"
-                      onerror="this.src='/src/assets/avatar_placeholder.png';"> 
-                  <span class="portrait-name">{{ char.character_name }}</span>
-                </div>
+          <div class="character-preview-section" v-if="getObjKarakterDariIds(infoCircle.character_ids).length > 0">
+            <strong>Karakter yang Dijual:</strong>
+            
+            <div :class="['portrait-container', { 'is-partial': !isPanelExpanded }]">
+              <div v-for="char in getObjKarakterDariIds(infoCircle.character_ids)" 
+                  :key="char.id" 
+                  class="portrait-card"
+                  :title="char.character_name"> 
+                <img :src="char.image_url" 
+                    :alt="char.character_name" 
+                    class="portrait-img"
+                    onerror="this.src='/src/assets/avatar_placeholder.png';"> 
+                <span class="portrait-name">{{ char.character_name }}</span>
               </div>
             </div>
+          </div>
 
           <p v-else>
             <strong>Karakter:</strong> <span style="color: grey;">-</span>
           </p>
          
-            <div style="margin: 12px 0; display: flex; flex-direction: column; gap: 6px;">
-              <strong>Katalog:</strong> 
-              <div>
-                <a v-if="infoCircle.link_katalog" 
-                  :href="ensureExternalLink(infoCircle.link_katalog)" 
-                  target="_blank" 
-                  class="btn-katalog-modern">
-                  <span>📖 Lihat Katalog</span>
-                  <span class="katalog-arrow">↗</span>
-                </a>
-                <span v-else style="color: grey; font-style: italic;">
-                  tidak ada katalog
-                </span>
-              </div>
+          <!-- KATALOG MODERN -->
+          <div style="margin: 12px 0; display: flex; flex-direction: column; gap: 6px;">
+            <strong>Katalog:</strong> 
+            <div>
+              <a v-if="infoCircle.link_katalog" 
+                :href="ensureExternalLink(infoCircle.link_katalog)" 
+                target="_blank" 
+                class="btn-katalog-modern">
+                <span>📖 Lihat Katalog</span>
+                <span class="katalog-arrow">↗</span>
+              </a>
+              <span v-else style="color: grey; font-style: italic;">
+                tidak ada katalog
+              </span>
             </div>
+          </div>
           
           <div style="margin-top: 15px;">
             <div v-if="infoCircle.status === 'verified'" class="status-badge verified">
@@ -1372,6 +1383,7 @@ watch(inputSearchKarakter, () => {
             </div>
           </div>
 
+          <!-- BAGIAN PENYUMBANG INFO (Rata Kiri) -->
           <div v-if="infoCircle.discord_id" class="contributor-section">
             <small class="contributor-label">🤝 Penyumbang Info:</small>
             <div class="contributor-list">
@@ -1434,6 +1446,7 @@ watch(inputSearchKarakter, () => {
           </div>
         </div>
 
+        <!-- FORM INPUT / EDIT DATA (FULL STATE OTOMATIS) -->
         <div v-if="showForm" class="form-card">
           
           <div v-if="!currentUser" style="text-align: center; padding: 20px 0;">
@@ -1499,17 +1512,16 @@ watch(inputSearchKarakter, () => {
                 @keydown="handleKeydown"
               >
 
-              <!-- Tambahkan ref="dropdownList" di sini -->
-                <ul ref="dropdownList" v-if="saranKarakter.length > 0" class="dropdown-sugesti" style="max-height: 350px; overflow-y: auto;">
-                  <li v-for="(saran, index) in saranKarakter" 
-                      :key="saran.character_name" 
-                      @click="tambahKarakter(saran); focusedIndex = -1;" 
-                      :style="{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: index === focusedIndex ? '#e0f2f1' : 'transparent' }"
-                      @mouseenter="focusedIndex = index">
-                    <img :src="saran.image_url" style="width: 25px; height: 25px; border-radius: 50%; object-fit: cover;" onerror="this.style.display='none'">
-                    {{ saran.character_name }}
-                  </li>
-                </ul>
+              <ul ref="dropdownList" v-if="saranKarakter.length > 0" class="dropdown-sugesti" style="max-height: 350px; overflow-y: auto;">
+                <li v-for="(saran, index) in saranKarakter" 
+                    :key="saran.character_name" 
+                    @click="tambahKarakter(saran); focusedIndex = -1;" 
+                    :style="{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: index === focusedIndex ? '#e0f2f1' : 'transparent' }"
+                    @mouseenter="focusedIndex = index">
+                  <img :src="saran.image_url" style="width: 25px; height: 25px; border-radius: 50%; object-fit: cover;" onerror="this.style.display='none'">
+                  {{ saran.character_name }}
+                </li>
+              </ul>
             </div>
 
             <button @click="submitData" class="btn-submit">Simpan Data</button>
