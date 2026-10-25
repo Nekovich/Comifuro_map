@@ -1116,7 +1116,43 @@ const sortMode = ref('alphabet'); // Pilihan: 'alphabet' atau 'popular'
 function toggleSortMode() {
   sortMode.value = sortMode.value === 'alphabet' ? 'popular' : 'alphabet';
 }
+const dropdownList = ref(null); // Tambahkan ref ini di daftar variabel atas jika belum ad
+const focusedIndex = ref(-1); // Untuk melacak posisi sorotan keyboard di dropdown
+async function handleKeydown(event) {
+  if (saranKarakter.value.length === 0) return;
 
+  if (event.key === 'ArrowDown') {
+    event.preventDefault();
+    focusedIndex.value = (focusedIndex.value + 1) % saranKarakter.value.length;
+    await scrollToFocused();
+  } else if (event.key === 'ArrowUp') {
+    event.preventDefault();
+    focusedIndex.value = (focusedIndex.value - 1 + saranKarakter.value.length) % saranKarakter.value.length;
+    await scrollToFocused();
+  } else if (event.key === 'Enter') {
+    event.preventDefault();
+    if (focusedIndex.value >= 0 && focusedIndex.value < saranKarakter.value.length) {
+      tambahKarakter(saranKarakter.value[focusedIndex.value]);
+      focusedIndex.value = -1;
+    }
+  }
+}
+async function scrollToFocused() {
+  await nextTick();
+  if (!dropdownList.value) return;
+  const items = dropdownList.value.querySelectorAll('li');
+  if (items[focusedIndex.value]) {
+    items[focusedIndex.value].scrollIntoView({
+      block: 'nearest',
+      behavior: 'smooth'
+    });
+  }
+}
+
+// Reset index saat input berubah
+watch(inputSearchKarakter, () => {
+  focusedIndex.value = -1;
+});
 </script>
 
 <template>
@@ -1129,7 +1165,7 @@ function toggleSortMode() {
       <div class="bar"></div>
     </button>
     <h1 class="navbar-logo">
-       Comifuro 23 Arknights MAP
+       Comifuro 23 Arknights Map
     </h1>
   </div>
 </nav>
@@ -1309,18 +1345,22 @@ function toggleSortMode() {
           <p v-else>
             <strong>Karakter:</strong> <span style="color: grey;">-</span>
           </p>
-          <p>
-            <strong>Katalog:</strong> 
-            <a v-if="infoCircle.link_katalog" 
-              :href="ensureExternalLink(infoCircle.link_katalog)" 
-              target="_blank" 
-              style="color: #3498db; text-decoration: none; font-weight: bold;">
-              Buka Katalog ↗
-            </a>
-            <span v-else style="color: grey; font-style: italic;">
-              tidak ada katalog
-            </span>
-          </p>
+         
+            <div style="margin: 12px 0; display: flex; flex-direction: column; gap: 6px;">
+              <strong>Katalog:</strong> 
+              <div>
+                <a v-if="infoCircle.link_katalog" 
+                  :href="ensureExternalLink(infoCircle.link_katalog)" 
+                  target="_blank" 
+                  class="btn-katalog-modern">
+                  <span>📖 Lihat Katalog</span>
+                  <span class="katalog-arrow">↗</span>
+                </a>
+                <span v-else style="color: grey; font-style: italic;">
+                  tidak ada katalog
+                </span>
+              </div>
+            </div>
           
           <div style="margin-top: 15px;">
             <div v-if="infoCircle.status === 'verified'" class="status-badge verified">
@@ -1454,16 +1494,22 @@ function toggleSortMode() {
               <input 
                 type="text" 
                 v-model="inputSearchKarakter" 
-                placeholder="Ketik nama operator..." 
+                placeholder="Ketik nama operator...(Gunakan Panah & Enter)" 
                 class="input-form"
+                @keydown="handleKeydown"
               >
 
-              <ul v-if="saranKarakter.length > 0" class="dropdown-sugesti">
-                <li v-for="saran in saranKarakter" :key="saran.character_name" @click="tambahKarakter(saran)" style="display: flex; align-items: center; gap: 10px;">
-                  <img :src="saran.image_url" style="width: 25px; height: 25px; border-radius: 50%; object-fit: cover;" onerror="this.style.display='none'">
-                  {{ saran.character_name }}
-                </li>
-              </ul>
+              <!-- Tambahkan ref="dropdownList" di sini -->
+                <ul ref="dropdownList" v-if="saranKarakter.length > 0" class="dropdown-sugesti" style="max-height: 350px; overflow-y: auto;">
+                  <li v-for="(saran, index) in saranKarakter" 
+                      :key="saran.character_name" 
+                      @click="tambahKarakter(saran); focusedIndex = -1;" 
+                      :style="{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: index === focusedIndex ? '#e0f2f1' : 'transparent' }"
+                      @mouseenter="focusedIndex = index">
+                    <img :src="saran.image_url" style="width: 25px; height: 25px; border-radius: 50%; object-fit: cover;" onerror="this.style.display='none'">
+                    {{ saran.character_name }}
+                  </li>
+                </ul>
             </div>
 
             <button @click="submitData" class="btn-submit">Simpan Data</button>
@@ -2172,17 +2218,18 @@ input[type="url"],
 /* Dropdown yang melayang */
 .dropdown-sugesti {
   position: absolute;
-  top: 100%; /* Muncul tepat di bawah input */
+  bottom: 100%; 
+  top: auto !important;
   left: 0;
   right: 0;
   z-index: 999; /* Pastikan paling depan */
   background: white;
   border: 1px solid #ddd;
-  border-radius: 4px;
+  border-radius: 8px 8px 0 0 !important; /* Sudut tumpul di bagian atas */
   list-style: none;
   padding: 0;
-  margin: 2px 0 0 0;
-  max-height: 200px;
+  margin: 0 0 4px 0 !important;
+  max-height: 300px !important;
   overflow-y: auto;
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
@@ -2337,7 +2384,7 @@ input[type="url"],
   margin-top: 20px;
   padding-top: 15px;
   border-top: 1px dashed #ddd;
-  text-align: center;
+  text-align: left;
 }
 
 .contributor-label {
@@ -2352,7 +2399,7 @@ input[type="url"],
 .contributor-list {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: left;
   gap: 8px;
 }
 
@@ -2782,4 +2829,44 @@ input[type="url"],
   height: 60px;
 }
 
+/* Styling Tombol Katalog Modern */
+.btn-katalog-modern {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #3498db, #2980b9);
+  color: white !important;
+  padding: 6px 14px;
+  border-radius: 20px;
+  text-decoration: none;
+  font-weight: bold;
+  font-size: 0.9rem;
+  box-shadow: 0 3px 10px rgba(52, 152, 219, 0.3);
+  transition: all 0.2s ease;
+}
+
+.btn-katalog-modern:hover {
+  background: linear-gradient(135deg, #2980b9, #1f618d);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(52, 152, 219, 0.4);
+}
+
+.btn-katalog-modern:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 5px rgba(52, 152, 219, 0.3);
+}
+
+.katalog-arrow {
+  font-size: 1rem;
+  transition: transform 0.2s ease;
+}
+
+.btn-katalog-modern:hover .katalog-arrow {
+  transform: translate(2px, -2px); /* Efek panah sedikit bergerak keluar saat di-hover */
+}
+.btn-katalog-modern,
+.btn-katalog-modern span,
+.btn-katalog-modern strong {
+  color: #ffffff !important; /* Paksa semua teks dan ikon di dalam tombol menjadi putih bersih */
+}
 </style>
